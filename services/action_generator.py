@@ -9,6 +9,16 @@ from services.privacy import redact_personal_data
 from services.scoring import MatchScore
 
 
+def normalize_generated_text(text):
+    """Convert escaped line breaks into readable paragraphs."""
+
+    return (
+        text.replace("\\r\\n", "\n")
+        .replace("\\n", "\n")
+        .strip()
+    )
+
+
 def generate_application_materials(
     safe_resume_text,
     job_requirements,
@@ -85,8 +95,26 @@ Recommendation: {match_score.recommendation}
 
     generated_data = structured_model.invoke(messages)
 
-    return ApplicationMaterials.model_validate(
+    materials = ApplicationMaterials.model_validate(
         generated_data
+    )
+
+    return materials.model_copy(
+        update={
+            "email_subject": normalize_generated_text(
+                materials.email_subject
+            ),
+            "email_body": normalize_generated_text(
+                materials.email_body
+            ),
+            "cover_letter": normalize_generated_text(
+                materials.cover_letter
+            ),
+            "interview_focus": [
+                normalize_generated_text(topic)
+                for topic in materials.interview_focus
+            ],
+        }
     )
 
 

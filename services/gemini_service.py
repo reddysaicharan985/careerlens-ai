@@ -13,8 +13,8 @@ def create_gemini_model():
         model=MODEL_NAME,
         api_key=get_google_api_key(),
         temperature=1.0,
-        max_retries=1,
-        timeout=30,
+        max_retries=4,
+timeout=60,
     )
 
 
@@ -50,4 +50,4 @@ def test_gemini_connection():
         "Reply with exactly: CareerLens AI connection successful"
     )
 
-    return extract_response_text(response)
+    return extract_response_text(response)  
