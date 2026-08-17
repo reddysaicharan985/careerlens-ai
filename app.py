@@ -2,6 +2,8 @@ import streamlit as st
 
 from services.job_parser import parse_job_description
 from services.privacy import redact_personal_data
+from services.resume_matcher import match_resume_to_job
+from services.scoring import calculate_match_score
 from tools.resume_tool import extract_resume_text
 
 
@@ -18,13 +20,13 @@ st.subheader(
 
 st.write(
     "Upload your resume and paste a job description. "
-    "CareerLens will analyze your suitability, identify "
-    "skill gaps and prepare personalized application material."
+    "CareerLens will compare your evidence with the role, "
+    "identify skill gaps and provide an honest recommendation."
 )
 
 st.info(
-    "Current milestone: privacy-protected resume extraction "
-    "and structured AI job-description analysis."
+    "Current milestone: privacy-protected, evidence-based "
+    "resume-to-job matching with transparent scoring."
 )
 
 st.divider()
@@ -45,11 +47,30 @@ job_description = st.text_area(
     ),
 )
 
+st.warning(
+    "Privacy notice: CareerLens removes email addresses, "
+    "phone numbers and URLs before matching. The remaining "
+    "resume content—including your name, city, education, "
+    "skills, experience and projects—may be sent to Gemini."
+)
+
+consent_given = st.checkbox(
+    "I understand and consent to sending the "
+    "privacy-protected resume text to Gemini for matching."
+)
+
 analyze_button = st.button(
     "Analyze Job Match",
     type="primary",
     use_container_width=True,
+    disabled=not consent_given,
 )
+
+if not consent_given:
+    st.caption(
+        "Review the privacy notice and provide consent "
+        "to enable resume matching."
+    )
 
 if analyze_button:
     if resume_file is None:
@@ -79,6 +100,17 @@ if analyze_button:
                     job_description
                 )
 
+            with st.spinner("Matching resume evidence to the role..."):
+                match_analysis = match_resume_to_job(
+                    safe_resume_text,
+                    job_requirements,
+                )
+
+            match_score = calculate_match_score(
+                job_requirements,
+                match_analysis,
+            )
+
         except ValueError as error:
             st.error(str(error))
 
@@ -92,7 +124,7 @@ if analyze_button:
             total_redactions = sum(redaction_counts.values())
 
             st.success(
-                "Resume protected and job description analyzed!"
+                "Resume protected and job match completed!"
             )
 
             column1, column2, column3, column4 = st.columns(4)
@@ -108,6 +140,134 @@ if analyze_button:
                 total_redactions,
             )
 
+            st.subheader("Match result")
+
+            score_column, recommendation_column = st.columns(
+                [1, 3]
+            )
+
+            score_column.metric(
+                "Overall match",
+                f"{match_score.overall_score}%",
+            )
+
+            recommendation_column.markdown("**Recommendation**")
+            recommendation_column.write(
+                match_score.recommendation
+            )
+
+            st.progress(match_score.overall_score / 100)
+            st.write(match_analysis.summary)
+
+            component_columns = st.columns(4)
+
+            component_columns[0].metric(
+                "Required skills",
+                (
+                    f"{match_score.required_skill_score}%"
+                    if match_score.required_skill_score is not None
+                    else "N/A"
+                ),
+            )
+
+            component_columns[1].metric(
+                "Preferred skills",
+                (
+                    f"{match_score.preferred_skill_score}%"
+                    if match_score.preferred_skill_score is not None
+                    else "N/A"
+                ),
+            )
+
+            component_columns[2].metric(
+                "Education",
+                (
+                    f"{match_score.education_score}%"
+                    if match_score.education_score is not None
+                    else "N/A"
+                ),
+            )
+
+            component_columns[3].metric(
+                "Experience",
+                (
+                    f"{match_score.experience_score}%"
+                    if match_score.experience_score is not None
+                    else "N/A"
+                ),
+            )
+
+            matched_column, missing_column = st.columns(2)
+
+            with matched_column:
+                st.markdown("### Matched required skills")
+
+                if match_analysis.matched_required_skills:
+                    for item in (
+                        match_analysis.matched_required_skills
+                    ):
+                        st.markdown(f"**{item.skill}**")
+                        st.caption(item.evidence)
+                else:
+                    st.write(
+                        "No required skills were supported "
+                        "by resume evidence."
+                    )
+
+            with missing_column:
+                st.markdown("### Missing required skills")
+
+                if match_analysis.missing_required_skills:
+                    for skill in (
+                        match_analysis.missing_required_skills
+                    ):
+                        st.markdown(f"- {skill}")
+                else:
+                    st.write(
+                        "No required skill gaps were identified."
+                    )
+
+            transferable_column, improvement_column = st.columns(2)
+
+            with transferable_column:
+                st.markdown("### Transferable skills")
+
+                if match_analysis.transferable_skills:
+                    for item in match_analysis.transferable_skills:
+                        st.markdown(f"**{item.skill}**")
+                        st.caption(item.evidence)
+                else:
+                    st.write(
+                        "No additional transferable skills "
+                        "were identified."
+                    )
+
+            with improvement_column:
+                st.markdown("### Improvement areas")
+
+                if match_analysis.improvement_areas:
+                    for area in match_analysis.improvement_areas:
+                        st.markdown(f"- {area}")
+                else:
+                    st.write(
+                        "No immediate improvement areas "
+                        "were identified."
+                    )
+
+            with st.expander("Candidate strengths"):
+                if match_analysis.strengths:
+                    for strength in match_analysis.strengths:
+                        st.markdown(f"- {strength}")
+                else:
+                    st.write("No strengths were identified.")
+
+            with st.expander("Education and experience evidence"):
+                st.markdown("**Education**")
+                st.write(match_analysis.education_evidence)
+                st.markdown("**Experience**")
+                st.write(match_analysis.experience_evidence)
+
+            st.divider()
             st.subheader("Structured job analysis")
 
             role_column, company_column, location_column = (
@@ -123,17 +283,7 @@ if analyze_button:
             location_column.markdown("**Location**")
             location_column.write(job_requirements.location)
 
-            type_column, level_column = st.columns(2)
-
-            type_column.markdown("**Employment type**")
-            type_column.write(job_requirements.employment_type)
-
-            level_column.markdown("**Experience level**")
-            level_column.write(job_requirements.experience_level)
-
-            skill_column, responsibility_column = st.columns(2)
-
-            with skill_column:
+            with st.expander("Job requirements and ATS keywords"):
                 st.markdown("**Required skills**")
 
                 if job_requirements.required_skills:
@@ -150,18 +300,8 @@ if analyze_button:
                 else:
                     st.write("No preferred skills were specified.")
 
-            with responsibility_column:
-                st.markdown("**Responsibilities**")
+                st.markdown("**Important ATS keywords**")
 
-                if job_requirements.responsibilities:
-                    for responsibility in (
-                        job_requirements.responsibilities
-                    ):
-                        st.markdown(f"- {responsibility}")
-                else:
-                    st.write("No responsibilities were specified.")
-
-            with st.expander("Important ATS keywords"):
                 if job_requirements.important_keywords:
                     st.write(
                         ", ".join(
@@ -172,17 +312,16 @@ if analyze_button:
                     st.write("No ATS keywords were identified.")
 
             with st.expander(
-                "Preview privacy-protected resume text"
+                "Preview the text that was sent for matching"
             ):
                 st.text_area(
-                    "Privacy-protected text",
+                    "Privacy-protected resume text",
                     value=safe_resume_text,
                     height=350,
                     disabled=True,
                 )
 
-            st.info(
-                "The resume has not been matched yet. "
-                "The next milestone will compare the protected "
-                "resume with these validated job requirements."
+            st.caption(
+                "CareerLens provides decision support, not a hiring "
+                "guarantee. Always review the original job post."
             )
