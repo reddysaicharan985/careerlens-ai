@@ -121,10 +121,24 @@ if analyze_button:
             st.error(str(error))
 
         except Exception as error:
-            st.error(
-                "CareerLens Agent could not complete the workflow. "
-                f"Technical details: {error}"
-            )
+            error_text = str(error).lower()
+
+            if "429" in error_text or "resource_exhausted" in error_text:
+                st.error(
+                    "The Gemini free-tier request limit has been reached. "
+                    "No money was charged. Please wait for the quota to reset "
+                    "and then run CareerLens again."
+                )
+            elif "503" in error_text or "unavailable" in error_text:
+                st.warning(
+                    "Gemini is temporarily unavailable because of high demand. "
+                    "Please wait a few minutes and try again."
+                )
+            else:
+                st.error(
+                    "CareerLens could not complete the analysis. "
+                    "Please check your inputs and try again."
+                )
 
 
 analysis = st.session_state.career_analysis
