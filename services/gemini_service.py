@@ -14,7 +14,7 @@ def create_gemini_model():
         api_key=get_google_api_key(),
         temperature=1.0,
         max_retries=4,
-timeout=60,
+        timeout=60,
     )
 
 
