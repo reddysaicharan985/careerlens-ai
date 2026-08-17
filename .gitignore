@@ -1,0 +1,23 @@
+# Python virtual environment
+.venv/
+
+# API keys and secrets
+.env
+.streamlit/secrets.toml
+
+# Python-generated files
+__pycache__/
+*.pyc
+*.pyo
+
+# Test and tool caches
+.pytest_cache/
+.mypy_cache/
+
+# Private uploaded resumes and local databases
+data/
+chroma_db/
+*.sqlite3
+
+# Logs
+*.log
