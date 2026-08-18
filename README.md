@@ -1,156 +1,112 @@
-\# CareerLens AI
-
-
+﻿# CareerLens AI
 
 CareerLens AI is an agentic resume and job-analysis assistant that compares verified resume evidence with a job description, calculates a transparent match score, and automatically chooses the appropriate next action.
 
+## Live Demo
 
+[Launch CareerLens AI](https://careerlens-ai-lkxgjanfs6r2wbv4fphesh.streamlit.app/)
 
-\## Live Demo
+- Suitable match: prepares application materials
 
+- Lower match: creates a targeted learning plan
 
+## Features
 
-\[Launch CareerLens AI](https://careerlens-ai-lkxgjanfs6r2wbv4fphesh.streamlit.app/)
+- Extracts text from PDF resumes
 
+- Removes email addresses, phone numbers and URLs
 
+- Converts job descriptions into structured requirements
 
-\- Suitable match: prepares application materials
+- Matches skills using verified resume evidence
 
-\- Lower match: creates a targeted learning plan
+- Calculates a transparent deterministic score
 
+- Uses LangGraph for conditional agent routing
 
+- Generates an application email and cover letter
 
-\## Features
+- Generates a targeted learning plan for lower matches
 
+- Provides downloadable application materials
 
+- Handles Gemini quota and availability errors
 
-\- Extracts text from PDF resumes
+- Includes automated privacy, scoring, routing and generation tests
 
-\- Removes email addresses, phone numbers and URLs
-
-\- Converts job descriptions into structured requirements
-
-\- Matches skills using verified resume evidence
-
-\- Calculates a transparent deterministic score
-
-\- Uses LangGraph for conditional agent routing
-
-\- Generates an application email and cover letter
-
-\- Generates a targeted learning plan for lower matches
-
-\- Provides downloadable application materials
-
-\- Handles Gemini quota and availability errors
-
-\- Includes automated privacy, scoring, routing and generation tests
-
-
-
-\## Agent Workflow
-
-
+## Agent Workflow
 
 ```mermaid
 
 flowchart TD
 
-&#x20;   A\[Resume and job description] --> B\[Privacy redaction]
+    A[Resume and job description] --> B[Privacy redaction]
 
-&#x20;   B --> C\[Parse job requirements]
+    B --> C[Parse job requirements]
 
-&#x20;   C --> D\[Match resume evidence]
+    C --> D[Match resume evidence]
 
-&#x20;   D --> E\[Calculate match score]
+    D --> E[Calculate match score]
 
-&#x20;   E --> F{Score at least 50%?}
+    E --> F{Score at least 50%?}
 
-&#x20;   F -->|Yes| G\[Prepare application]
+    F -->|Yes| G[Prepare application]
 
-&#x20;   F -->|No| H\[Create learning plan]
+    F -->|No| H[Create learning plan]
 
 ```
 
+## Technology Stack
 
+- Python
 
-\## Technology Stack
+- Streamlit
 
+- LangChain
 
+- LangGraph
 
-\- Python
+- Google Gemini API
 
-\- Streamlit
+- Pydantic
 
-\- LangChain
+- PyPDF
 
-\- LangGraph
+- Pytest
 
-\- Google Gemini API
+- Git and GitHub
 
-\- Pydantic
-
-\- PyPDF
-
-\- Pytest
-
-\- Git and GitHub
-
-
-
-\## Scoring System
-
-
+## Scoring System
 
 CareerLens evaluates:
 
+- Required skills: 70%
 
+- Preferred skills: 10%
 
-\- Required skills: 70%
+- Education: 10%
 
-\- Preferred skills: 10%
-
-\- Education: 10%
-
-\- Experience: 10%
-
-
+- Experience: 10%
 
 Only components specified by the job description are included in the final weighted score.
 
-
-
-\## Privacy
-
-
+## Privacy
 
 CareerLens removes the following information before resume matching:
 
+- Email addresses
 
+- Phone numbers
 
-\- Email addresses
-
-\- Phone numbers
-
-\- URLs
-
-
+- URLs
 
 The user must provide consent before analysis begins.
 
+The remaining resume contentâ€”including name, city, education, skills, projects and experienceâ€”may be sent to Gemini.
 
-
-The remaining resume content—including name, city, education, skills, projects and experience—may be sent to Gemini.
-
-
-
-\## Installation
-
-
+## Installation
 
 Clone the repository:
-
-
 
 ```bash
 
@@ -160,11 +116,7 @@ cd careerlens-ai
 
 ```
 
-
-
 Create and activate a virtual environment:
-
-
 
 ```bash
 
@@ -172,23 +124,15 @@ python -m venv .venv
 
 ```
 
-
-
 Windows:
-
-
 
 ```powershell
 
-.\\.venv\\Scripts\\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 
 ```
 
-
-
 Install dependencies:
-
-
 
 ```bash
 
@@ -196,27 +140,17 @@ python -m pip install -r requirements.txt
 
 ```
 
-
-
 Create a `.env` file:
-
-
 
 ```env
 
-GOOGLE\_API\_KEY=your\_google\_gemini\_api\_key
+GOOGLE_API_KEY=your_google_gemini_api_key
 
 ```
 
-
-
 Never commit the `.env` file or expose the API key publicly.
 
-
-
-\## Run the Application
-
-
+## Run the Application
 
 ```bash
 
@@ -224,11 +158,7 @@ streamlit run app.py
 
 ```
 
-
-
-\## Run Automated Tests
-
-
+## Run Automated Tests
 
 ```bash
 
@@ -236,11 +166,7 @@ python -m pytest -v
 
 ```
 
-
-
 Current result:
-
-
 
 ```text
 
@@ -248,93 +174,76 @@ Current result:
 
 ```
 
-
-
 The automated tests do not call Gemini and therefore do not consume API quota.
 
-
-
-\## Project Structure
-
-
+## Project Structure
 
 ```text
 
 careerlens-ai/
 
-├── app.py
+â”œâ”€â”€ app.py
 
-├── agent.py
+â”œâ”€â”€ agent.py
 
-├── config.py
+â”œâ”€â”€ config.py
 
-├── requirements.txt
+â”œâ”€â”€ requirements.txt
 
-├── services/
+â”œâ”€â”€ services/
 
-│   ├── action\_generator.py
+â”‚   â”œâ”€â”€ action_generator.py
 
-│   ├── action\_schema.py
+â”‚   â”œâ”€â”€ action_schema.py
 
-│   ├── gemini\_service.py
+â”‚   â”œâ”€â”€ gemini_service.py
 
-│   ├── job\_parser.py
+â”‚   â”œâ”€â”€ job_parser.py
 
-│   ├── job\_schema.py
+â”‚   â”œâ”€â”€ job_schema.py
 
-│   ├── match\_schema.py
+â”‚   â”œâ”€â”€ match_schema.py
 
-│   ├── privacy.py
+â”‚   â”œâ”€â”€ privacy.py
 
-│   ├── resume\_matcher.py
+â”‚   â”œâ”€â”€ resume_matcher.py
 
-│   └── scoring.py
+â”‚   â””â”€â”€ scoring.py
 
-├── tools/
+â”œâ”€â”€ tools/
 
-│   └── resume\_tool.py
+â”‚   â””â”€â”€ resume_tool.py
 
-└── tests/
+â””â”€â”€ tests/
 
-&#x20;   ├── test\_action\_generator.py
+    â”œâ”€â”€ test_action_generator.py
 
-&#x20;   ├── test\_agent\_routing.py
+    â”œâ”€â”€ test_agent_routing.py
 
-&#x20;   ├── test\_privacy.py
+    â”œâ”€â”€ test_privacy.py
 
-&#x20;   └── test\_scoring.py
+    â””â”€â”€ test_scoring.py
 
 ```
 
+## Important Limitations
 
+- CareerLens provides decision support, not a hiring guarantee.
 
-\## Important Limitations
+- Generated application materials must be reviewed before use.
 
+- Match quality depends on the resume and job-description details.
 
+- Free Gemini API usage is subject to rate limits.
 
-\- CareerLens provides decision support, not a hiring guarantee.
+- The application currently accepts PDF resumes only.
 
-\- Generated application materials must be reviewed before use.
+## Developer
 
-\- Match quality depends on the resume and job-description details.
+**Mukkara Sai Charan Reddy**
 
-\- Free Gemini API usage is subject to rate limits.
+B.Tech CSEâ€“AIML student focused on AI engineering, RAG systems, agentic workflows and practical AI applications.
 
-\- The application currently accepts PDF resumes only.
+[LinkedIn](https://www.linkedin.com/in/sai-charan-reddy-mukkara)
 
-
-
-\## Developer
-
-
-
-\*\*Mukkara Sai Charan Reddy\*\*
-
-
-
-B.Tech CSE–AIML student focused on AI engineering, RAG systems, agentic workflows and practical AI applications.
-
-
-
-\[LinkedIn](https://www.linkedin.com/in/sai-charan-reddy-mukkara)
 
