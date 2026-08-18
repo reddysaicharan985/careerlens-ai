@@ -4,7 +4,7 @@ CareerLens AI is an agentic resume and job-analysis assistant that compares veri
 
 ## Live Demo
 
-[Launch CareerLens AI](https://careerlens-ai-lkxgjanfs6r2wbv4fphesh.streamlit.app/)
+[Launch CareerLens AI](https://careerlens-by-saicharan.streamlit.app/)
 
 - Suitable match: prepares application materials
 
@@ -245,5 +245,6 @@ careerlens-ai/
 B.Tech CSEâ€“AIML student focused on AI engineering, RAG systems, agentic workflows and practical AI applications.
 
 [LinkedIn](https://www.linkedin.com/in/sai-charan-reddy-mukkara)
+
 
 
