@@ -6,6 +6,14 @@ CareerLens AI is an agentic resume and job-analysis assistant that compares veri
 
 
 
+\## Live Demo
+
+
+
+\[Launch CareerLens AI](https://careerlens-ai-lkxgjanfs6r2wbv4fphesh.streamlit.app/)
+
+
+
 \- Suitable match: prepares application materials
 
 \- Lower match: creates a targeted learning plan
