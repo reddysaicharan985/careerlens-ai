@@ -6,6 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 
 from agent import careerlens_agent
+from services.ats_analyzer import analyze_ats_readiness
 from services.privacy import redact_personal_data
 from tools.resume_tool import extract_resume_text
 
@@ -102,11 +103,17 @@ async def analyze_resume(
                 "job_description": cleaned_job_description,
             }
         )
+        ats_readiness = analyze_ats_readiness(
+            resume_text=resume_text,
+            page_count=page_count,
+            job_requirements=agent_result["job_requirements"],
+        )
 
         public_analysis = {
             "job_requirements": agent_result["job_requirements"],
             "match_analysis": agent_result["match_analysis"],
             "match_score": agent_result["match_score"],
+            "ats_readiness": ats_readiness,
         }
 
         if "application_materials" in agent_result:

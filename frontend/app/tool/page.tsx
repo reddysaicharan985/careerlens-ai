@@ -36,13 +36,25 @@ type AnalysisResponse = {
       }[];
       missing_required_skills: string[];
     };
-    match_score: {
+        match_score: {
       overall_score: number;
       recommendation: string;
       required_skill_score: number | null;
       preferred_skill_score: number | null;
       education_score: number | null;
       experience_score: number | null;
+    };
+    ats_readiness: {
+      overall_score: number;
+      parseability_score: number;
+      section_score: number;
+      keyword_score: number;
+      impact_score: number;
+      found_sections: string[];
+      missing_sections: string[];
+      matched_keywords: string[];
+      missing_keywords: string[];
+      recommendations: string[];
     };
     route: string;
   };
@@ -567,7 +579,131 @@ export default function ResumeAnalyzerPage() {
                 </strong>
               </div>
             </div>
+            <section className="mt-8 rounded-3xl border border-violet-200 bg-violet-50 p-5 sm:p-7">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                <div className="grid h-24 w-24 shrink-0 place-items-center rounded-full border-[10px] border-violet-600 bg-white">
+                  <div className="text-center">
+                    <strong className="block text-2xl font-black">
+                      {
+                        analysisResult.analysis.ats_readiness
+                          .overall_score
+                      }
+                    </strong>
+                    <span className="text-[9px] text-slate-500">
+                      out of 100
+                    </span>
+                  </div>
+                </div>
 
+                <div>
+                  <p className="text-xs font-extrabold uppercase tracking-wider text-violet-700">
+                    ATS readiness estimate
+                  </p>
+
+                  <h3 className="mt-2 text-xl font-black sm:text-2xl">
+                    Resume structure and keyword readiness
+                  </h3>
+
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    This transparent estimate checks PDF readability,
+                    standard sections, employer-keyword coverage and
+                    measurable impact. It does not reproduce a specific
+                    employer&apos;s private ATS.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs text-slate-500">Parseability</p>
+                  <strong className="mt-2 block text-lg">
+                    {
+                      analysisResult.analysis.ats_readiness
+                        .parseability_score
+                    }
+                    /20
+                  </strong>
+                </div>
+
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs text-slate-500">Sections</p>
+                  <strong className="mt-2 block text-lg">
+                    {
+                      analysisResult.analysis.ats_readiness
+                        .section_score
+                    }
+                    /25
+                  </strong>
+                </div>
+
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs text-slate-500">Keywords</p>
+                  <strong className="mt-2 block text-lg">
+                    {
+                      analysisResult.analysis.ats_readiness
+                        .keyword_score
+                    }
+                    /35
+                  </strong>
+                </div>
+
+                <div className="rounded-2xl bg-white p-4">
+                  <p className="text-xs text-slate-500">Impact</p>
+                  <strong className="mt-2 block text-lg">
+                    {
+                      analysisResult.analysis.ats_readiness
+                        .impact_score
+                    }
+                    /20
+                  </strong>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-5 md:grid-cols-2">
+                <div className="rounded-2xl bg-white p-5">
+                  <h4 className="font-extrabold">Missing ATS keywords</h4>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {analysisResult.analysis.ats_readiness
+                      .missing_keywords.length > 0 ? (
+                      analysisResult.analysis.ats_readiness.missing_keywords.map(
+                        (keyword) => (
+                          <span
+                            key={keyword}
+                            className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900"
+                          >
+                            {keyword}
+                          </span>
+                        ),
+                      )
+                    ) : (
+                      <p className="text-sm text-emerald-700">
+                        All extracted keywords were found.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white p-5">
+                  <h4 className="font-extrabold">
+                    ATS improvement actions
+                  </h4>
+
+                  <ul className="mt-3 space-y-2">
+                    {analysisResult.analysis.ats_readiness.recommendations.map(
+                      (recommendation) => (
+                        <li
+                          key={recommendation}
+                          className="text-sm leading-6 text-slate-600"
+                        >
+                          • {recommendation}
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </section>
             <div className="mt-8 grid gap-5 md:grid-cols-2">
               <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                 <h3 className="font-extrabold text-emerald-900">
