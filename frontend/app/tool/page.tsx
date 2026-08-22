@@ -12,6 +12,41 @@ import {
 } from "../components";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+type AnalysisResponse = {
+  success: boolean;
+  resume: {
+    filename: string;
+    page_count: number;
+    character_count: number;
+    private_details_removed: number;
+  };
+  analysis: {
+    job_requirements: {
+      job_title: string;
+      company_name: string;
+      location: string;
+      required_skills: string[];
+      preferred_skills: string[];
+    };
+    match_analysis: {
+      summary: string;
+      matched_required_skills: {
+        skill: string;
+        evidence: string;
+      }[];
+      missing_required_skills: string[];
+    };
+    match_score: {
+      overall_score: number;
+      recommendation: string;
+      required_skill_score: number | null;
+      preferred_skill_score: number | null;
+      education_score: number | null;
+      experience_score: number | null;
+    };
+    route: string;
+  };
+};
 
 function formatFileSize(bytes: number) {
   if (bytes < 1024) {
@@ -30,6 +65,9 @@ export default function ResumeAnalyzerPage() {
   const [jobDescription, setJobDescription] = useState("");
   const [error, setError] = useState("");
   const [inputsReady, setInputsReady] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] =
+    useState<AnalysisResponse | null>(null);
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const selectedFile = event.target.files?.[0];
@@ -42,7 +80,7 @@ export default function ResumeAnalyzerPage() {
       return;
     }
 
-    const allowedExtensions = [".pdf", ".doc", ".docx", ".txt"];
+    const allowedExtensions = [".pdf"];
     const lowercaseName = selectedFile.name.toLowerCase();
 
     const isAllowed = allowedExtensions.some((extension) =>
@@ -51,7 +89,7 @@ export default function ResumeAnalyzerPage() {
 
     if (!isAllowed) {
       setResumeFile(null);
-      setError("Please upload a PDF, DOC, DOCX or TXT resume.");
+      setError("Please upload a PDF resume.");
       event.target.value = "";
       return;
     }
@@ -66,10 +104,11 @@ export default function ResumeAnalyzerPage() {
     setResumeFile(selectedFile);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setInputsReady(false);
+    setAnalysisResult(null);
 
     if (!resumeFile) {
       setError("Upload your resume before starting the analysis.");
@@ -83,22 +122,58 @@ export default function ResumeAnalyzerPage() {
       return;
     }
 
-    setInputsReady(true);
+    const formData = new FormData();
+    formData.append("resume", resumeFile);
+    formData.append("job_description", jobDescription.trim());
 
-    setTimeout(() => {
-      document
-        .getElementById("connection-status")
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
-    }, 100);
-  }
+    setIsAnalyzing(true);
+
+    try {
+      const apiUrl =
+        process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+
+      const response = await fetch(`${apiUrl}/analyze`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          responseData.detail ||
+            "CareerLens could not complete the analysis.",
+        );
+      }
+
+           setAnalysisResult(responseData as AnalysisResponse);
+      setInputsReady(true);
+
+      setTimeout(() => {
+        document
+          .getElementById("connection-status")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+      }, 100);
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error
+          ? requestError.message
+          : "Unable to connect to the CareerLens API.";
+
+      setError(message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+    }
 
   function clearForm() {
     setResumeFile(null);
     setJobDescription("");
     setInputsReady(false);
+    setAnalysisResult(null);
     setError("");
 
     const fileInput = document.getElementById(
@@ -213,7 +288,7 @@ export default function ResumeAnalyzerPage() {
                   </h2>
 
                   <p className="text-xs text-slate-500">
-                    PDF, DOCX or TXT · maximum 5 MB
+                    PDF only · maximum 5 MB
                   </p>
                 </div>
               </div>
@@ -229,7 +304,7 @@ export default function ResumeAnalyzerPage() {
                 <input
                   id="resume-upload"
                   type="file"
-                  accept=".pdf,.doc,.docx,.txt"
+                  accept=".pdf"
                   onChange={handleFileChange}
                   className="sr-only"
                 />
@@ -332,11 +407,14 @@ export default function ResumeAnalyzerPage() {
                 Clear
               </button>
 
-              <button
+                            <button
                 type="submit"
-                className="flex min-h-13 flex-1 items-center justify-center rounded-xl bg-slate-950 px-6 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-600"
+                disabled={isAnalyzing}
+                className="flex min-h-13 flex-1 items-center justify-center rounded-xl bg-slate-950 px-6 text-sm font-bold text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Analyze resume match →
+                {isAnalyzing
+                  ? "Analyzing your resume..."
+                  : "Analyze resume match →"}
               </button>
             </div>
 
@@ -417,46 +495,145 @@ export default function ResumeAnalyzerPage() {
           </aside>
         </div>
 
-        {/* Honest integration status */}
-        {inputsReady && (
+                {/* Real CareerLens analysis results */}
+        {inputsReady && analysisResult && (
           <section
             id="connection-status"
-            className="mt-10 rounded-3xl border border-emerald-200 bg-emerald-50 p-6 sm:p-8"
+            className="mt-10 rounded-3xl border border-emerald-200 bg-white p-5 shadow-[0_25px_70px_rgba(49,44,91,0.08)] sm:p-8"
           >
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-              <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-emerald-100 text-2xl text-emerald-700">
-                ✓
-              </span>
+            <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="grid h-28 w-28 shrink-0 place-items-center rounded-full border-[12px] border-violet-600 bg-violet-50">
+                <div className="text-center">
+                  <strong className="block text-3xl font-black">
+                    {analysisResult.analysis.match_score.overall_score}
+                  </strong>
+                  <span className="text-[10px] text-slate-500">
+                    out of 100
+                  </span>
+                </div>
+              </div>
 
               <div className="flex-1">
                 <p className="text-xs font-extrabold uppercase tracking-wider text-emerald-700">
-                  Frontend inputs ready
+                  Analysis completed
                 </p>
 
-                <h2 className="mt-2 text-2xl font-black tracking-tight">
-                  Resume and job description validated.
+                <h2 className="mt-2 text-2xl font-black tracking-tight sm:text-3xl">
+                  {analysisResult.analysis.job_requirements.job_title}
                 </h2>
 
+                <p className="mt-2 text-sm font-semibold text-violet-700">
+                  {analysisResult.analysis.match_score.recommendation}
+                </p>
+
                 <p className="mt-3 text-sm leading-7 text-slate-600">
-                  The interface is working correctly. The next development
-                  stage will connect this form to your existing CareerLens
-                  Python agents through a secure FastAPI endpoint.
+                  {analysisResult.analysis.match_analysis.summary}
                 </p>
               </div>
             </div>
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">Resume pages</p>
+                <strong className="mt-2 block text-xl">
+                  {analysisResult.resume.page_count}
+                </strong>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">Required skills</p>
+                <strong className="mt-2 block text-xl">
+                  {analysisResult.analysis.match_score
+                    .required_skill_score ?? "N/A"}
+                  %
+                </strong>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">Education match</p>
+                <strong className="mt-2 block text-xl">
+                  {analysisResult.analysis.match_score.education_score ??
+                    "N/A"}
+                  %
+                </strong>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 p-4">
+                <p className="text-xs text-slate-500">
+                  Private details removed
+                </p>
+                <strong className="mt-2 block text-xl">
+                  {analysisResult.resume.private_details_removed}
+                </strong>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-5 md:grid-cols-2">
+              <section className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                <h3 className="font-extrabold text-emerald-900">
+                  Matched required skills
+                </h3>
+
+                <div className="mt-4 space-y-4">
+                  {analysisResult.analysis.match_analysis
+                    .matched_required_skills.length > 0 ? (
+                    analysisResult.analysis.match_analysis.matched_required_skills.map(
+                      (item) => (
+                        <div key={item.skill}>
+                          <p className="text-sm font-bold text-emerald-900">
+                            ✓ {item.skill}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-slate-600">
+                            {item.evidence}
+                          </p>
+                        </div>
+                      ),
+                    )
+                  ) : (
+                    <p className="text-sm text-slate-600">
+                      No required skills were confirmed.
+                    </p>
+                  )}
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5">
+                <h3 className="font-extrabold text-amber-900">
+                  Missing required skills
+                </h3>
+
+                <ul className="mt-4 space-y-3">
+                  {analysisResult.analysis.match_analysis
+                    .missing_required_skills.length > 0 ? (
+                    analysisResult.analysis.match_analysis.missing_required_skills.map(
+                      (skill) => (
+                        <li
+                          key={skill}
+                          className="text-sm text-amber-900"
+                        >
+                          • {skill}
+                        </li>
+                      ),
+                    )
+                  ) : (
+                    <li className="text-sm text-slate-600">
+                      No required skill gaps were identified.
+                    </li>
+                  )}
+                </ul>
+              </section>
+            </div>
           </section>
         )}
-
         <section className="mt-10 rounded-2xl border border-amber-200 bg-amber-50 p-5">
           <h2 className="font-extrabold text-amber-900">
-            Development notice
+             Important notice
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-amber-800">
-            This page currently validates the inputs only. It does not yet send
-            the resume to Gemini or display a fake match score. We will connect
-            your real resume extraction, privacy redaction, job parser, scoring
-            and agent-routing services in the backend stage.
+                        CareerLens provides evidence-based decision support, not a hiring
+            guarantee. Always review the score, identified skills and generated
+            application materials before applying..
           </p>
         </section>
       </section>
