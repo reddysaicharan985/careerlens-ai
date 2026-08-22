@@ -8,3 +8,6 @@ langchain-chroma
 chromadb
 pydantic
 pytest
+fastapi
+uvicorn
+python-multipart
