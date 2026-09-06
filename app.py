@@ -122,19 +122,19 @@ if analyze_button:
             st.error(str(error))
 
         except Exception as error:
-    error_text = str(error).lower()
+            error_text = str(error).lower()
 
-    if "all careerlens ai providers" in error_text:
-        st.error(
-            "All CareerLens AI providers are temporarily unavailable "
-            "or have reached their current usage limits. "
-            "Please try again later."
-        )
-    else:
-        st.error(
-            "CareerLens could not complete the analysis. "
-            "Please check your inputs and try again."
-        )
+            if "all careerlens ai providers" in error_text:
+                st.error(
+                    "All CareerLens AI providers are temporarily unavailable "
+                    "or have reached their current usage limits. "
+                    "Please try again later."
+                )
+            else:
+                st.error(
+                    "CareerLens could not complete the analysis. "
+                    "Please check your inputs and try again."
+                )
 
 
 analysis = st.session_state.career_analysis
