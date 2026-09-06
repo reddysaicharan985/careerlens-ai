@@ -8,3 +8,4 @@ langchain-chroma
 chromadb
 pydantic
 pytest
+requests

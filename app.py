@@ -51,14 +51,15 @@ job_description = st.text_area(
 
 st.warning(
     "Privacy notice: CareerLens removes email addresses, "
-    "phone numbers and URLs before matching. The remaining "
+    "phone numbers and URLs before AI processing. The remaining "
     "resume content—including your name, city, education, "
-    "skills, experience and projects—may be sent to Gemini."
+    "skills, experience and projects—may be processed by one "
+    "of CareerLens's configured AI providers."
 )
 
 consent_given = st.checkbox(
     "I understand and consent to sending the "
-    "privacy-protected resume text to Gemini for matching."
+    "privacy-protected resume text to CareerLens AI providers."
 )
 
 analyze_button = st.button(
@@ -121,24 +122,19 @@ if analyze_button:
             st.error(str(error))
 
         except Exception as error:
-            error_text = str(error).lower()
+    error_text = str(error).lower()
 
-            if "429" in error_text or "resource_exhausted" in error_text:
-                st.error(
-                    "The Gemini free-tier request limit has been reached. "
-                    "No money was charged. Please wait for the quota to reset "
-                    "and then run CareerLens again."
-                )
-            elif "503" in error_text or "unavailable" in error_text:
-                st.warning(
-                    "Gemini is temporarily unavailable because of high demand. "
-                    "Please wait a few minutes and try again."
-                )
-            else:
-                st.error(
-                    "CareerLens could not complete the analysis. "
-                    "Please check your inputs and try again."
-                )
+    if "all careerlens ai providers" in error_text:
+        st.error(
+            "All CareerLens AI providers are temporarily unavailable "
+            "or have reached their current usage limits. "
+            "Please try again later."
+        )
+    else:
+        st.error(
+            "CareerLens could not complete the analysis. "
+            "Please check your inputs and try again."
+        )
 
 
 analysis = st.session_state.career_analysis
@@ -375,7 +371,9 @@ if analysis is not None:
         else:
             st.write("No ATS keywords were identified.")
 
-    with st.expander("Preview the resume text sent to Gemini"):
+    with st.expander(
+    "Preview the privacy-protected resume text sent to AI"
+):
         st.text_area(
             "Privacy-protected resume text",
             value=safe_resume_text,

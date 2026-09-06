@@ -1,4 +1,4 @@
-from services.gemini_service import create_gemini_model
+from services.ai_router import generate_structured
 from services.job_schema import JobRequirements
 
 
@@ -13,14 +13,7 @@ def parse_job_description(job_description):
             "100 characters."
         )
 
-    model = create_gemini_model()
-
-    structured_model = model.with_structured_output(
-        schema=JobRequirements.model_json_schema(),
-        method="json_schema",
-    )
-
-    prompt = f"""
+    system_prompt = """
 You are the job-description analysis component of CareerLens AI.
 
 Extract only information explicitly stated in the job description.
@@ -32,12 +25,19 @@ Rules:
 4. Separate required skills from preferred skills.
 5. Include useful technical and ATS keywords.
 6. Keep each responsibility clear and concise.
+""".strip()
 
+    user_prompt = f"""
 JOB DESCRIPTION:
 
 {cleaned_description}
-"""
+""".strip()
 
-    extracted_data = structured_model.invoke(prompt)
+    extracted_data = generate_structured(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        schema=JobRequirements.model_json_schema(),
+        max_tokens=2000,
+    )
 
     return JobRequirements.model_validate(extracted_data)
