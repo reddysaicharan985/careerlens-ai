@@ -1,4 +1,4 @@
-from services.gemini_service import create_gemini_model
+from services.ai_router import generate_structured
 from services.job_schema import JobRequirements
 from services.match_schema import ResumeMatchAnalysis
 from services.privacy import redact_personal_data
@@ -27,19 +27,7 @@ def match_resume_to_job(
             "The protected resume does not contain enough text."
         )
 
-    model = create_gemini_model()
-
-    structured_model = model.with_structured_output(
-        schema=ResumeMatchAnalysis.model_json_schema(),
-        method="json_schema",
-    )
-
-    job_data = job_requirements.model_dump_json(indent=2)
-
-    messages = [
-        (
-            "system",
-            """
+    system_prompt = """
 You are the evidence-based resume matching component
 of CareerLens AI.
 
@@ -58,22 +46,23 @@ Rules:
 7. If education or experience is not required by the job,
    treat it as satisfied and explain that it was not specified.
 8. Keep the summary factual, concise and constructive.
-""",
-        ),
-        (
-            "human",
-            f"""
+""".strip()
+
+    user_prompt = f"""
 <JOB_REQUIREMENTS>
-{job_data}
+{job_requirements.model_dump_json(indent=2)}
 </JOB_REQUIREMENTS>
 
 <PROTECTED_RESUME>
 {safe_resume_text}
 </PROTECTED_RESUME>
-""",
-        ),
-    ]
+""".strip()
 
-    extracted_data = structured_model.invoke(messages)
+    extracted_data = generate_structured(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        schema=ResumeMatchAnalysis.model_json_schema(),
+        max_tokens=3000,
+    )
 
     return ResumeMatchAnalysis.model_validate(extracted_data)

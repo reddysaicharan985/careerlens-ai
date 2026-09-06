@@ -6,20 +6,43 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+def get_api_key(name: str) -> str:
+    """
+    Load an API key or configuration value.
+
+    Works locally with .env and on Streamlit Cloud
+    with root-level Streamlit Secrets.
+    """
+
+    value = os.getenv(name, "").strip()
+
+    if not value:
+        raise RuntimeError(
+            f"{name} was not found in the environment."
+        )
+
+    return value
+
+
+def get_cerebras_api_key():
+    return get_api_key("CEREBRAS_API_KEY")
+
+
+def get_groq_api_key():
+    return get_api_key("GROQ_API_KEY")
+
+
 def get_google_api_key():
-    """Load and validate the Gemini API key."""
+    return get_api_key("GOOGLE_API_KEY")
 
-    api_key = os.getenv("GOOGLE_API_KEY", "").strip()
 
-    if not api_key:
-        raise RuntimeError(
-            "GOOGLE_API_KEY was not found. "
-            "Add it to the local .env file."
-        )
+def get_cloudflare_api_token():
+    return get_api_key("CLOUDFLARE_API_TOKEN")
 
-    if api_key == "your_gemini_api_key_here":
-        raise RuntimeError(
-            "Replace the placeholder API key in .env."
-        )
 
-    return api_key
+def get_cloudflare_account_id():
+    return get_api_key("CLOUDFLARE_ACCOUNT_ID")
+
+
+def get_openrouter_api_key():
+    return get_api_key("OPENROUTER_API_KEY")
