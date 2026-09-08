@@ -6,7 +6,8 @@ import os
 import pandas as pd
 import streamlit as st
 
-from services.telemetry import query_rows
+from services.ai_router import PROVIDER_REQUIREMENTS
+from services.telemetry import provider_summary_rows, query_rows
 
 
 st.set_page_config(page_title="CareerLens M&E", page_icon="📊", layout="wide")
@@ -60,13 +61,9 @@ monitoring, evaluation, traces = st.tabs(
     ["Monitoring", "Evaluation", "Recent Traces"]
 )
 with monitoring:
-    providers = pd.DataFrame(query_rows("""SELECT provider,
-        COUNT(*) AS attempts, ROUND(100.0 * AVG(success), 1) AS success_rate,
-        ROUND(AVG(latency_ms), 1) AS avg_latency_ms,
-        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS fallback_failures,
-        SUM(CASE WHEN http_status = 429 THEN 1 ELSE 0 END) AS quota_429,
-        SUM(CASE WHEN error_type = 'timeout' THEN 1 ELSE 0 END) AS timeouts
-        FROM provider_attempts GROUP BY provider ORDER BY attempts DESC"""))
+    providers = pd.DataFrame(
+        provider_summary_rows(PROVIDER_REQUIREMENTS)
+    )
     if providers.empty:
         st.info("No provider attempts recorded yet.")
     else:
