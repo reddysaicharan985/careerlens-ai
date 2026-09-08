@@ -148,3 +148,23 @@ def query_rows(sql: str, parameters=()):
         raise ValueError("Telemetry dashboard queries must be read-only")
     with _connect() as connection:
         return [dict(row) for row in connection.execute(sql, parameters).fetchall()]
+
+
+def provider_summary_rows(provider_names):
+    """Return monitoring totals for supported providers only."""
+    provider_names = tuple(provider_names)
+    if not provider_names:
+        return []
+    placeholders = ", ".join("?" for _ in provider_names)
+    return query_rows(
+        f"""SELECT provider,
+        COUNT(*) AS attempts, ROUND(100.0 * AVG(success), 1) AS success_rate,
+        ROUND(AVG(latency_ms), 1) AS avg_latency_ms,
+        SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS fallback_failures,
+        SUM(CASE WHEN http_status = 429 THEN 1 ELSE 0 END) AS quota_429,
+        SUM(CASE WHEN error_type = 'timeout' THEN 1 ELSE 0 END) AS timeouts
+        FROM provider_attempts
+        WHERE provider IN ({placeholders})
+        GROUP BY provider ORDER BY attempts DESC""",
+        provider_names,
+    )

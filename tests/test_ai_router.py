@@ -6,6 +6,15 @@ import requests
 from services import ai_router, telemetry
 
 
+@pytest.fixture(autouse=True)
+def isolate_router_telemetry(monkeypatch, tmp_path):
+    """Keep fake provider attempts out of the developer's real dashboard."""
+    monkeypatch.setenv(
+        "CAREERLENS_TELEMETRY_DB",
+        str(tmp_path / "router-test-telemetry.sqlite3"),
+    )
+
+
 def _response_error(status):
     response = requests.Response()
     response.status_code = status
@@ -20,7 +29,6 @@ def _clear_provider_environment(monkeypatch):
 
 def test_missing_credentials_skip_providers_and_explain_configuration(monkeypatch, tmp_path):
     _clear_provider_environment(monkeypatch)
-    monkeypatch.setenv("CAREERLENS_TELEMETRY_DB", str(tmp_path / "telemetry.sqlite3"))
     called = []
     monkeypatch.setattr(
         ai_router,
@@ -89,8 +97,7 @@ def test_malformed_output_retries_then_falls_back(monkeypatch):
 
 
 def test_telemetry_never_contains_credentials_or_content(monkeypatch, tmp_path):
-    database = tmp_path / "telemetry.sqlite3"
-    monkeypatch.setenv("CAREERLENS_TELEMETRY_DB", str(database))
+    database = telemetry.database_path()
     monkeypatch.setenv("CEREBRAS_API_KEY", "super-secret-api-key")
     monkeypatch.setattr(
         ai_router,
