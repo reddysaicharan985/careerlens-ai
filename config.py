@@ -24,6 +24,11 @@ def get_api_key(name: str) -> str:
     return value
 
 
+def has_configuration(*names: str) -> bool:
+    """Return whether all named settings are present, without reading them out."""
+    return all(bool(os.getenv(name, "").strip()) for name in names)
+
+
 def get_cerebras_api_key():
     return get_api_key("CEREBRAS_API_KEY")
 
