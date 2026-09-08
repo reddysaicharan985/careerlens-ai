@@ -248,3 +248,25 @@ B.Tech CSEâ€“AIML student focused on AI engineering, RAG systems, agentic w
 
 
 
+
+## Monitoring and Evaluation Dashboard
+
+CareerLens records privacy-safe operational telemetry across its existing
+five-provider fallback router. Open **Monitoring Evaluation** from Streamlit's
+page navigation to see shared KPIs and the Monitoring, Evaluation, and Recent
+Traces tabs.
+
+Protect the page by setting the required password in `.env` or root-level
+Streamlit Secrets:
+
+```env
+CAREERLENS_DASHBOARD_PASSWORD=choose-a-strong-password
+```
+
+Telemetry is stored in `data/telemetry/careerlens.sqlite3` by default. The
+location can be overridden with `CAREERLENS_TELEMETRY_DB`. The database stores
+only opaque trace IDs, timestamps, outcomes, latency, provider/HTTP/error
+classification, aggregate match scores, routing decisions, page counts, and
+redaction counts. It never stores resume text, job descriptions, names, emails,
+phone numbers, URLs, prompts, model responses, or API keys. The local telemetry
+directory is excluded from Git.

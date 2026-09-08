@@ -16,6 +16,7 @@ __pycache__/
 
 # Private uploaded resumes and local databases
 data/
+data/telemetry/
 chroma_db/
 *.sqlite3
 
