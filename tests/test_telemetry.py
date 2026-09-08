@@ -92,6 +92,16 @@ def test_dashboard_queries_are_read_only(monkeypatch, tmp_path):
         raise AssertionError("A mutating query was accepted")
 
 
+def test_provider_summary_excludes_injected_test_providers(monkeypatch, tmp_path):
+    configure_database(monkeypatch, tmp_path)
+    telemetry.record_provider_attempt("Gemini", 125, True)
+    telemetry.record_provider_attempt("Backup", 1, True)
+
+    rows = telemetry.provider_summary_rows(ai_router.PROVIDER_REQUIREMENTS)
+
+    assert [row["provider"] for row in rows] == ["Gemini"]
+
+
 def test_dashboard_tabs_render_with_match_score(monkeypatch, tmp_path):
     configure_database(monkeypatch, tmp_path)
     monkeypatch.setenv("CAREERLENS_DASHBOARD_PASSWORD", "test-password")
