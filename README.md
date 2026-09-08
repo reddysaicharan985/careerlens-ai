@@ -170,7 +170,7 @@ Current result:
 
 ```text
 
-10 passed
+14 passed
 
 ```
 
@@ -190,6 +190,10 @@ careerlens-ai/
 
 â”œâ”€â”€ requirements.txt
 
+â”œâ”€â”€ pages/
+
+â”‚   â””â”€â”€ Monitoring_Evaluation.py
+
 â”œâ”€â”€ services/
 
 â”‚   â”œâ”€â”€ action_generator.py
@@ -208,7 +212,9 @@ careerlens-ai/
 
 â”‚   â”œâ”€â”€ resume_matcher.py
 
-â”‚   â””â”€â”€ scoring.py
+â”‚   â”œâ”€â”€ scoring.py
+
+â”‚   â””â”€â”€ telemetry.py
 
 â”œâ”€â”€ tools/
 
@@ -222,7 +228,9 @@ careerlens-ai/
 
     â”œâ”€â”€ test_privacy.py
 
-    â””â”€â”€ test_scoring.py
+    â”œâ”€â”€ test_scoring.py
+
+    â””â”€â”€ test_telemetry.py
 
 ```
 
