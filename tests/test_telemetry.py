@@ -1,6 +1,8 @@
 import sqlite3
+from pathlib import Path
 
 import requests
+from streamlit.testing.v1 import AppTest
 
 from services import ai_router, telemetry
 
@@ -86,3 +88,28 @@ def test_dashboard_queries_are_read_only(monkeypatch, tmp_path):
         assert "read-only" in str(error)
     else:
         raise AssertionError("A mutating query was accepted")
+
+
+def test_dashboard_tabs_render_with_match_score(monkeypatch, tmp_path):
+    configure_database(monkeypatch, tmp_path)
+    monkeypatch.setenv("CAREERLENS_DASHBOARD_PASSWORD", "test-password")
+    telemetry.record_analysis(
+        "dashboard-test-trace", True, 750, 72, "application", 2, 3
+    )
+
+    dashboard_path = (
+        Path(__file__).parents[1] / "pages" / "Monitoring_Evaluation.py"
+    )
+    dashboard = AppTest.from_file(dashboard_path)
+    dashboard.run(timeout=10)
+    assert not dashboard.exception
+
+    dashboard.text_input[0].set_value("test-password")
+    dashboard.button[0].click().run(timeout=10)
+
+    assert not dashboard.exception
+    assert [tab.label for tab in dashboard.tabs] == [
+        "Monitoring",
+        "Evaluation",
+        "Recent Traces",
+    ]

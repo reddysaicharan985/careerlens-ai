@@ -92,7 +92,13 @@ with evaluation:
         else:
             bins = pd.cut(scores["match_score"], bins=[0, 20, 40, 60, 80, 100],
                           include_lowest=True).value_counts(sort=False)
-            st.bar_chart(bins)
+            score_distribution = bins.rename_axis("score_range").reset_index(
+                name="analyses"
+            )
+            score_distribution["score_range"] = score_distribution[
+                "score_range"
+            ].astype(str)
+            st.bar_chart(score_distribution.set_index("score_range"))
     with right:
         st.subheader("Routing decisions")
         if routes.empty:
