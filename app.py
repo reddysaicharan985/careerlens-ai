@@ -1,7 +1,10 @@
+import time
+
 import streamlit as st
 
 from agent import careerlens_agent
 from services.privacy import redact_personal_data
+from services.telemetry import new_trace_id, record_analysis, trace_context
 from tools.resume_tool import extract_resume_text
 
 
@@ -89,25 +92,50 @@ if analyze_button:
         )
 
     else:
+        trace_id = new_trace_id()
+        started = time.perf_counter()
+        page_count = 0
+        total_redactions = 0
         try:
-            with st.spinner("Reading and protecting your resume..."):
-                resume_text, page_count = extract_resume_text(
-                    resume_file
-                )
-                safe_resume_text, redaction_counts = (
-                    redact_personal_data(resume_text)
-                )
+            with trace_context(trace_id):
+                with st.spinner("Reading and protecting your resume..."):
+                    resume_text, page_count = extract_resume_text(
+                        resume_file
+                    )
+                    safe_resume_text, redaction_counts = (
+                        redact_personal_data(resume_text)
+                    )
+                    total_redactions = sum(redaction_counts.values())
 
-            with st.spinner(
-                "CareerLens Agent is analyzing and choosing "
-                "the next action..."
-            ):
-                agent_result = careerlens_agent.invoke(
-                    {
-                        "safe_resume_text": safe_resume_text,
-                        "job_description": job_description.strip(),
-                    }
+                with st.spinner(
+                    "CareerLens Agent is analyzing and choosing "
+                    "the next action..."
+                ):
+                    agent_result = careerlens_agent.invoke(
+                        {
+                            "safe_resume_text": safe_resume_text,
+                            "job_description": job_description.strip(),
+                        }
+                    )
+
+            route = (
+                "application"
+                if "application_materials" in agent_result
+                else "learning_plan"
+            )
+            try:
+                record_analysis(
+                    trace_id=trace_id,
+                    success=True,
+                    processing_ms=(time.perf_counter() - started) * 1000,
+                    match_score=agent_result["match_score"].overall_score,
+                    route=route,
+                    page_count=page_count,
+                    redaction_count=total_redactions,
                 )
+            except Exception:
+                # A telemetry write failure must not hide a valid analysis.
+                pass
 
             st.session_state.career_analysis = {
                 "agent_result": agent_result,
@@ -119,12 +147,34 @@ if analyze_button:
             }
 
         except ValueError as error:
+            try:
+                record_analysis(
+                    trace_id, False, (time.perf_counter() - started) * 1000,
+                    None, "unknown", page_count, total_redactions,
+                    type(error).__name__,
+                )
+            except Exception:
+                pass
             st.error(str(error))
 
         except Exception as error:
+            try:
+                record_analysis(
+                    trace_id, False, (time.perf_counter() - started) * 1000,
+                    None, "unknown", page_count, total_redactions,
+                    type(error).__name__,
+                )
+            except Exception:
+                pass
             error_text = str(error).lower()
 
-            if "all careerlens ai providers" in error_text:
+            if "no careerlens ai provider is configured" in error_text:
+                st.error(
+                    "CareerLens has no configured AI provider. "
+                    "Please ask the app administrator to configure at least "
+                    "one provider credential."
+                )
+            elif "all careerlens ai providers" in error_text:
                 st.error(
                     "All CareerLens AI providers are temporarily unavailable "
                     "or have reached their current usage limits. "

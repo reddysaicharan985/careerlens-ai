@@ -1,8 +1,11 @@
 import json
+import os
 import re
+import time
 from typing import Callable
 
 import requests
+from services.telemetry import record_provider_attempt
 
 from config import (
     get_cerebras_api_key,
@@ -15,6 +18,8 @@ from config import (
 
 
 REQUEST_TIMEOUT = 60
+MAX_PROVIDER_ATTEMPTS = 2
+RETRY_BACKOFF_SECONDS = 0.25
 
 
 # ---------------------------------------------------------
@@ -240,6 +245,69 @@ PROVIDERS = [
     ("OpenRouter", _call_openrouter),
 ]
 
+PROVIDER_ENVIRONMENT_VARIABLES = {
+    "Cerebras": ("CEREBRAS_API_KEY",),
+    "Groq": ("GROQ_API_KEY",),
+    "Gemini": ("GOOGLE_API_KEY",),
+    "Cloudflare": ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"),
+    "OpenRouter": ("OPENROUTER_API_KEY",),
+}
+
+
+def _provider_is_configured(provider_name):
+    """Check required settings without reading or exposing their values."""
+    required_variables = PROVIDER_ENVIRONMENT_VARIABLES.get(provider_name, ())
+    return all(os.getenv(name, "").strip() for name in required_variables)
+
+
+def _record_attempt(provider_name, started, success, status=None, error_type=None):
+    """Record metadata without allowing telemetry errors to affect routing."""
+    try:
+        record_provider_attempt(
+            provider_name,
+            (time.perf_counter() - started) * 1000,
+            success,
+            status,
+            error_type,
+        )
+    except Exception:
+        pass
+
+
+def _error_metadata(error):
+    """Return privacy-safe error classification and an optional HTTP status."""
+    status = None
+    if isinstance(error, requests.exceptions.HTTPError):
+        response = getattr(error, "response", None)
+        status = getattr(response, "status_code", None)
+        if status in {401, 403}:
+            error_type = "authentication_error"
+        elif status == 429:
+            error_type = "quota"
+        elif status is not None and status >= 500:
+            error_type = "server_error"
+        else:
+            error_type = "http_error"
+    elif isinstance(error, requests.exceptions.Timeout):
+        error_type = "timeout"
+    elif isinstance(error, requests.exceptions.ConnectionError):
+        error_type = "connection_error"
+    elif isinstance(error, (ValueError, json.JSONDecodeError, KeyError)):
+        error_type = "invalid_response"
+    else:
+        error_type = type(error).__name__
+    return status, error_type
+
+
+def _is_retryable(error_type):
+    return error_type in {
+        "quota",
+        "server_error",
+        "timeout",
+        "connection_error",
+        "invalid_response",
+    }
+
 
 def _generate_with_fallback(
     system_prompt: str,
@@ -256,27 +324,54 @@ def _generate_with_fallback(
     """
 
     failures = []
+    configured_provider_count = 0
 
     for provider_name, provider_function in PROVIDERS:
-        try:
-            response_text = provider_function(
-                system_prompt,
-                user_prompt,
-                max_tokens,
+        if not _provider_is_configured(provider_name):
+            started = time.perf_counter()
+            _record_attempt(
+                provider_name, started, False, error_type="configuration_error"
             )
-
-            if not response_text:
-                raise ValueError("Provider returned empty output.")
-
-            return validator(response_text)
-
-        except Exception as error:
-            failures.append(
-                f"{provider_name}: "
-                f"{type(error).__name__}"
-            )
-
+            failures.append(f"{provider_name}: configuration_error")
             continue
+
+        configured_provider_count += 1
+        for attempt_number in range(1, MAX_PROVIDER_ATTEMPTS + 1):
+            started = time.perf_counter()
+            try:
+                response_text = provider_function(
+                    system_prompt,
+                    user_prompt,
+                    max_tokens,
+                )
+
+                if not response_text:
+                    raise ValueError("Provider returned empty output.")
+
+                result = validator(response_text)
+                _record_attempt(provider_name, started, True)
+                return result
+
+            except Exception as error:
+                status, error_type = _error_metadata(error)
+                _record_attempt(
+                    provider_name, started, False, status, error_type
+                )
+                failures.append(f"{provider_name}: {error_type}")
+
+                should_retry = (
+                    attempt_number < MAX_PROVIDER_ATTEMPTS
+                    and _is_retryable(error_type)
+                )
+                if not should_retry:
+                    break
+                time.sleep(RETRY_BACKOFF_SECONDS)
+
+    if configured_provider_count == 0:
+        raise RuntimeError(
+            "No CareerLens AI provider is configured. Configure at least one "
+            "provider credential and try again."
+        )
 
     raise RuntimeError(
         "All CareerLens AI providers are currently unavailable. "

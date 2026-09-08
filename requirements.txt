@@ -9,3 +9,4 @@ chromadb
 pydantic
 pytest
 requests
+pandas
