@@ -168,7 +168,13 @@ if analyze_button:
                 pass
             error_text = str(error).lower()
 
-            if "all careerlens ai providers" in error_text:
+            if "no ai provider is configured" in error_text:
+                st.error(
+                    "CareerLens has no configured AI provider. Add credentials "
+                    "for Cerebras, Groq, Gemini, Cloudflare, or OpenRouter, "
+                    "then try again."
+                )
+            elif "all careerlens ai providers" in error_text:
                 st.error(
                     "All CareerLens AI providers are temporarily unavailable "
                     "or have reached their current usage limits. "

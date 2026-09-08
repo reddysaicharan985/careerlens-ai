@@ -56,6 +56,8 @@ def test_router_records_failed_and_successful_provider_attempts(monkeypatch, tmp
     assert attempts == [
         {"trace_id": "opaque-test-trace", "provider": "Limited", "success": 0,
          "http_status": 429, "error_type": "quota"},
+        {"trace_id": "opaque-test-trace", "provider": "Limited", "success": 0,
+         "http_status": 429, "error_type": "quota"},
         {"trace_id": "opaque-test-trace", "provider": "Healthy", "success": 1,
          "http_status": None, "error_type": None},
     ]

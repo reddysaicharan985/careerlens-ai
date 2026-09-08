@@ -30,7 +30,7 @@ CareerLens AI is an agentic resume and job-analysis assistant that compares veri
 
 - Provides downloadable application materials
 
-- Handles Gemini quota and availability errors
+- Uses readiness checks, bounded retries, and automatic fallback across five AI providers
 
 - Includes automated privacy, scoring, routing and generation tests
 
@@ -66,7 +66,7 @@ flowchart TD
 
 - LangGraph
 
-- Google Gemini API
+- Cerebras, Groq, Google Gemini, Cloudflare Workers AI, and OpenRouter APIs
 
 - Pydantic
 
@@ -102,7 +102,7 @@ CareerLens removes the following information before resume matching:
 
 The user must provide consent before analysis begins.
 
-The remaining resume contentâ€”including name, city, education, skills, projects and experienceâ€”may be sent to Gemini.
+The remaining resume contentâ€”including name, city, education, skills, projects and experienceâ€”may be sent to a configured AI provider. Operational telemetry never stores this content.
 
 ## Installation
 
@@ -144,11 +144,22 @@ Create a `.env` file:
 
 ```env
 
+# Configure at least one provider:
+CEREBRAS_API_KEY=your_cerebras_api_key
+GROQ_API_KEY=your_groq_api_key
 GOOGLE_API_KEY=your_google_gemini_api_key
+CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
+OPENROUTER_API_KEY=your_openrouter_api_key
 
 ```
 
-Never commit the `.env` file or expose the API key publicly.
+Never commit the `.env` file or expose API keys publicly. CareerLens checks only
+whether each provider's required variables are present and skips unconfigured
+providers. Cloudflare requires both of its listed values; every other provider
+requires its single listed key. Temporary transport failures, HTTP 429/5xx, and
+malformed output are retried once with a short delay before fallback. HTTP 401
+and 403 responses are never retried, but fallback still continues.
 
 ## Run the Application
 
@@ -174,7 +185,7 @@ Current result:
 
 ```
 
-The automated tests do not call Gemini and therefore do not consume API quota.
+The automated tests mock all providers and therefore do not consume API quota.
 
 ## Project Structure
 

@@ -13,10 +13,12 @@ from config import (
     get_google_api_key,
     get_groq_api_key,
     get_openrouter_api_key,
+    has_configuration,
 )
 
 
 REQUEST_TIMEOUT = 60
+RETRY_BACKOFF_SECONDS = 0.1
 
 
 # ---------------------------------------------------------
@@ -242,6 +244,22 @@ PROVIDERS = [
     ("OpenRouter", _call_openrouter),
 ]
 
+PROVIDER_REQUIREMENTS = {
+    "Cerebras": ("CEREBRAS_API_KEY",),
+    "Groq": ("GROQ_API_KEY",),
+    "Gemini": ("GOOGLE_API_KEY",),
+    "Cloudflare": ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"),
+    "OpenRouter": ("OPENROUTER_API_KEY",),
+}
+
+
+def provider_readiness():
+    """Return configuration readiness without returning credential values."""
+    return {
+        provider: has_configuration(*required_names)
+        for provider, required_names in PROVIDER_REQUIREMENTS.items()
+    }
+
 
 def _error_metadata(error):
     """Return privacy-safe error classification and an optional HTTP status."""
@@ -252,11 +270,45 @@ def _error_metadata(error):
         error_type = "quota" if status == 429 else "http_error"
     elif isinstance(error, requests.exceptions.Timeout):
         error_type = "timeout"
+    elif isinstance(error, requests.exceptions.ConnectionError):
+        error_type = "connection_error"
     elif isinstance(error, (ValueError, json.JSONDecodeError, KeyError)):
         error_type = "invalid_response"
     else:
         error_type = type(error).__name__
     return status, error_type
+
+
+def _is_retryable(error, status):
+    """Retry only transient transport/status failures and malformed output."""
+    if status in (401, 403):
+        return False
+    if status == 429 or (status is not None and 500 <= status <= 599):
+        return True
+    return isinstance(
+        error,
+        (
+            requests.exceptions.Timeout,
+            requests.exceptions.ConnectionError,
+            ValueError,
+            KeyError,
+        ),
+    )
+
+
+def _record_attempt(provider, started, success, status=None, error_type=None):
+    """Record allowlisted operational metadata on a best-effort basis."""
+    try:
+        record_provider_attempt(
+            provider,
+            (time.perf_counter() - started) * 1000,
+            success,
+            status,
+            error_type,
+        )
+    except Exception:
+        # Observability must never interrupt the provider fallback chain.
+        pass
 
 
 def _generate_with_fallback(
@@ -274,48 +326,49 @@ def _generate_with_fallback(
     """
 
     failures = []
+    configured_provider_count = 0
+    readiness = provider_readiness()
 
     for provider_name, provider_function in PROVIDERS:
-        started = time.perf_counter()
-        try:
-            response_text = provider_function(
-                system_prompt,
-                user_prompt,
-                max_tokens,
+        # Unknown names support injected providers in tests and extensions.
+        if provider_name in readiness and not readiness[provider_name]:
+            started = time.perf_counter()
+            _record_attempt(
+                provider_name, started, False, error_type="configuration_error"
             )
-
-            if not response_text:
-                raise ValueError("Provider returned empty output.")
-
-            result = validator(response_text)
-            try:
-                record_provider_attempt(
-                    provider_name, (time.perf_counter() - started) * 1000, True
-                )
-            except Exception:
-                # Telemetry is best-effort and must not affect AI availability.
-                pass
-            return result
-
-        except Exception as error:
-            status, error_type = _error_metadata(error)
-            try:
-                record_provider_attempt(
-                    provider_name,
-                    (time.perf_counter() - started) * 1000,
-                    False,
-                    status,
-                    error_type,
-                )
-            except Exception:
-                # Observability must never interrupt the provider fallback chain.
-                pass
-            failures.append(
-                f"{provider_name}: "
-                f"{type(error).__name__}"
-            )
-
+            failures.append(f"{provider_name}: configuration_error")
             continue
+
+        configured_provider_count += 1
+        for attempt_number in range(2):
+            started = time.perf_counter()
+            try:
+                response_text = provider_function(
+                    system_prompt,
+                    user_prompt,
+                    max_tokens,
+                )
+                if not response_text:
+                    raise ValueError("Provider returned empty output.")
+                result = validator(response_text)
+                _record_attempt(provider_name, started, True)
+                return result
+            except Exception as error:
+                status, error_type = _error_metadata(error)
+                _record_attempt(
+                    provider_name, started, False, status, error_type
+                )
+                failures.append(f"{provider_name}: {error_type}")
+                if attempt_number == 0 and _is_retryable(error, status):
+                    time.sleep(RETRY_BACKOFF_SECONDS)
+                    continue
+                break
+
+    if configured_provider_count == 0:
+        raise RuntimeError(
+            "No AI provider is configured. Add credentials for at least one "
+            "supported provider to the environment and try again."
+        )
 
     raise RuntimeError(
         "All CareerLens AI providers are currently unavailable. "
