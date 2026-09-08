@@ -1,8 +1,10 @@
 import json
 import re
+import time
 from typing import Callable
 
 import requests
+from services.telemetry import record_provider_attempt
 
 from config import (
     get_cerebras_api_key,
@@ -241,6 +243,22 @@ PROVIDERS = [
 ]
 
 
+def _error_metadata(error):
+    """Return privacy-safe error classification and an optional HTTP status."""
+    status = None
+    if isinstance(error, requests.exceptions.HTTPError):
+        response = getattr(error, "response", None)
+        status = getattr(response, "status_code", None)
+        error_type = "quota" if status == 429 else "http_error"
+    elif isinstance(error, requests.exceptions.Timeout):
+        error_type = "timeout"
+    elif isinstance(error, (ValueError, json.JSONDecodeError, KeyError)):
+        error_type = "invalid_response"
+    else:
+        error_type = type(error).__name__
+    return status, error_type
+
+
 def _generate_with_fallback(
     system_prompt: str,
     user_prompt: str,
@@ -258,6 +276,7 @@ def _generate_with_fallback(
     failures = []
 
     for provider_name, provider_function in PROVIDERS:
+        started = time.perf_counter()
         try:
             response_text = provider_function(
                 system_prompt,
@@ -268,9 +287,29 @@ def _generate_with_fallback(
             if not response_text:
                 raise ValueError("Provider returned empty output.")
 
-            return validator(response_text)
+            result = validator(response_text)
+            try:
+                record_provider_attempt(
+                    provider_name, (time.perf_counter() - started) * 1000, True
+                )
+            except Exception:
+                # Telemetry is best-effort and must not affect AI availability.
+                pass
+            return result
 
         except Exception as error:
+            status, error_type = _error_metadata(error)
+            try:
+                record_provider_attempt(
+                    provider_name,
+                    (time.perf_counter() - started) * 1000,
+                    False,
+                    status,
+                    error_type,
+                )
+            except Exception:
+                # Observability must never interrupt the provider fallback chain.
+                pass
             failures.append(
                 f"{provider_name}: "
                 f"{type(error).__name__}"
