@@ -1,9 +1,56 @@
+import json
 import sqlite3
 
 import pytest
 import requests
 
 from services import ai_router, telemetry
+from services.action_schema import ApplicationMaterials, LearningPlan
+
+
+@pytest.mark.parametrize("invalid", [
+    {"description": "Application materials", "properties": {}},
+    {"email_subject": "Application"},
+    {"email_subject": [], "email_body": "Body", "cover_letter": "Letter"},
+    [],
+])
+def test_invalid_application_fields_retry_then_use_backup(monkeypatch, invalid):
+    calls = []
+    valid = {"email_subject": "Application", "email_body": "Body",
+             "cover_letter": "Letter", "interview_focus": ["Python"]}
+
+    def malformed(*args):
+        calls.append(1)
+        return json.dumps(invalid)
+
+    monkeypatch.setattr(ai_router, "PROVIDERS", [
+        ("Malformed", malformed), ("Backup", lambda *args: json.dumps(valid)),
+    ])
+    monkeypatch.setattr(ai_router.time, "sleep", lambda seconds: None)
+    result = ai_router.generate_structured(
+        "system", "user", ApplicationMaterials.model_json_schema()
+    )
+    assert ApplicationMaterials.model_validate(result).email_body == "Body"
+    assert len(calls) == 2
+    rows = telemetry.query_rows(
+        "SELECT success, error_type FROM provider_attempts ORDER BY id"
+    )
+    assert [(r["success"], r["error_type"]) for r in rows] == [
+        (0, "invalid_response"), (0, "invalid_response"), (1, None),
+    ]
+
+
+def test_invalid_nested_fields_exhaust_providers_without_leaking_output(monkeypatch):
+    invalid = {"priority_steps": [{"skill": "private-generated-content"}],
+               "suggested_project": "Project", "readiness_note": "Practice"}
+    monkeypatch.setattr(ai_router, "PROVIDERS", [
+        ("Malformed", lambda *args: json.dumps(invalid)),
+    ])
+    monkeypatch.setattr(ai_router.time, "sleep", lambda seconds: None)
+    with pytest.raises(RuntimeError, match="currently unavailable") as error:
+        ai_router.generate_structured("system", "user", LearningPlan.model_json_schema())
+    assert "private-generated-content" not in str(error.value)
+    assert b"private-generated-content" not in telemetry.database_path().read_bytes()
 
 
 @pytest.fixture(autouse=True)
