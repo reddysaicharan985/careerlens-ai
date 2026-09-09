@@ -4,6 +4,7 @@ import time
 from typing import Callable
 
 import requests
+from jsonschema.validators import validator_for
 from services.telemetry import record_provider_attempt
 
 from config import (
@@ -468,6 +469,18 @@ def generate_structured(
     Pydantic validation.
     """
 
+    validator_class = validator_for(schema)
+    validator_class.check_schema(schema)
+    schema_validator = validator_class(schema)
+
+    def validate_response(text):
+        data = _extract_json(text)
+        if not isinstance(data, dict) or not schema_validator.is_valid(data):
+            # Do not include generated resume/application content in errors.
+            # Raising here keeps invalid output inside the retry/fallback loop.
+            raise ValueError("AI response does not match the required schema.")
+        return data
+
     schema_text = json.dumps(
         schema,
         indent=2,
@@ -488,11 +501,14 @@ Do not include explanations before or after the JSON.
 The JSON must follow this schema:
 
 {schema_text}
+
+Return an instance of this schema containing the actual requested content.
+Do not return the schema itself or its field descriptions.
 """.strip()
 
     return _generate_with_fallback(
         system_prompt=structured_system_prompt,
         user_prompt=user_prompt,
         max_tokens=max_tokens,
-        validator=_extract_json,
+        validator=validate_response,
     )
