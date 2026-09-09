@@ -9,4 +9,5 @@ chromadb
 pydantic
 pytest
 requests
+jsonschema>=4.18,<5
 pandas
